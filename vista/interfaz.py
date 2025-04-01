@@ -3,8 +3,8 @@ import shutil
 import pandas as pd
 from tkinter import PhotoImage, BOTH, CENTER, W, X, messagebox
 from ttkbootstrap import ttk, Style
-from tkinter import Tk
-from openpyxl import load_workbook
+from tkinter import Tk, Toplevel
+from logica.operaciones import obtener_preguntas, reemplazar_pregunta, guardar_preguntas
 
 CARPETA_ARCHIVOS = "."
 CARPETA_EDITADOS = "editados"
@@ -19,9 +19,11 @@ class ExcelApp:
     def __init__(self, root):
         self.root = root
         root.title("Buscador de Preguntas Disponibles")
-        root.geometry("600x750")
-        logo = PhotoImage(file="./logo.png")
-        root.iconphoto(False, logo)
+        root.geometry("820x750")
+
+        if os.path.exists("./logo.png"):
+            logo = PhotoImage(file="./logo.png")
+            root.iconphoto(False, logo)
 
         style = Style("cosmo")
 
@@ -75,24 +77,68 @@ class ExcelApp:
         ruta_archivo = os.path.join(CARPETA_ARCHIVOS, archivo)
 
         try:
-            df = pd.read_excel(ruta_archivo)
-
-            # Filtrar preguntas libres por tema
-            df_filtrado = df[df["TEMA"].isin(temas) & df[COLUMNAS_CURSO].isna().all(axis=1)]
-            seleccionadas = df_filtrado.sample(n=min(num_preguntas, len(df_filtrado)))
-
-            if seleccionadas.empty:
-                messagebox.showinfo("Sin resultados", "No se encontraron preguntas disponibles con esos criterios.")
+            encabezados, seleccionadas, disponibles = obtener_preguntas(ruta_archivo, temas, COLUMNAS_CURSO, num_preguntas)
+            if not seleccionadas:
+                messagebox.showinfo("Sin resultados", "No se encontraron preguntas disponibles.")
                 return
 
-            # Aquí iría la interfaz para mostrar preguntas y permitir descartar
-            messagebox.showinfo("Preguntas encontradas", f"Se encontraron {len(seleccionadas)} preguntas libres.")
+            self.mostrar_resultado(encabezados, seleccionadas, disponibles, archivo)
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo procesar el archivo: {e}")
+
+    def mostrar_resultado(self, encabezados, seleccionadas, disponibles, archivo_original):
+        self.resultado = Toplevel(self.root)
+        self.resultado.title("Revisión de Preguntas")
+        self.resultado.geometry("850x500")
+
+        self.encabezados = encabezados
+        self.preguntas = seleccionadas
+        self.pool = disponibles
+        self.archivo_original = archivo_original
+
+        self.tree = ttk.Treeview(self.resultado, columns=("#", "Pregunta", "Respuesta", "Correcta"), show="headings")
+        self.tree.heading("#", text="#")
+        self.tree.heading("Pregunta", text="Pregunta")
+        self.tree.heading("Respuesta", text="Opciones")
+        self.tree.heading("Correcta", text="Correcta")
+        self.tree.column("#", width=30, anchor=CENTER)
+        self.tree.column("Pregunta", width=300)
+        self.tree.column("Respuesta", width=350)
+        self.tree.column("Correcta", width=150)
+
+        for i, fila in enumerate(self.preguntas, start=1):
+            self.tree.insert("", "end", iid=str(i - 1), values=(i, fila[1], fila[2], fila[6]))
+
+        self.tree.pack(fill=BOTH, expand=True, padx=10, pady=10)
+
+        boton_reemplazar = ttk.Button(self.resultado, text="Reemplazar seleccionada", command=self.reemplazar_pregunta)
+        boton_guardar = ttk.Button(self.resultado, text="Guardar archivo", command=self.guardar_excel)
+        boton_reemplazar.pack(pady=5)
+        boton_guardar.pack(pady=5)
+
+    def reemplazar_pregunta(self):
+        item = self.tree.selection()
+        if not item:
+            messagebox.showinfo("Atención", "Selecciona una pregunta en la tabla para reemplazar.")
+            return
+        index = int(item[0])
+        nueva = reemplazar_pregunta(self.pool, self.preguntas, index)
+        if nueva:
+            self.tree.item(item, values=(index + 1, nueva[1], nueva[2], nueva[6]))
+        else:
+            messagebox.showinfo("Sin reemplazos", "No hay más preguntas disponibles para reemplazar.")
+
+    def guardar_excel(self):
+        os.makedirs(CARPETA_EDITADOS, exist_ok=True)
+        destino = os.path.join(CARPETA_EDITADOS, f"EDITADO_{self.archivo_original}")
+        guardar_preguntas(self.encabezados, self.preguntas, destino)
+        messagebox.showinfo("Éxito", f"Archivo guardado como {destino}")
+        self.resultado.destroy()
 
     def _try_parse_int(self, value):
         try:
             return int(value)
         except:
             return None
+            
