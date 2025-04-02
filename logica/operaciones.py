@@ -14,7 +14,8 @@ def verificar_columnas(encabezados):
 def filtrar_por_curso(sheet, temas, idx_tema, idx_curso_especifico):
     filas_filtradas = []
     for row in sheet.iter_rows(min_row=2, values_only=True):
-        if row[idx_tema] in temas and (row[idx_curso_especifico] is None or row[idx_curso_especifico] == ""):
+        cumple_tema = not temas or row[idx_tema] in temas  # Si no hay temas, es general
+        if cumple_tema and (row[idx_curso_especifico] is None or row[idx_curso_especifico] == ""):
             filas_filtradas.append(row)
     return filas_filtradas
 
@@ -31,6 +32,7 @@ def seleccionar_preguntas(filas_filtradas, num_preguntas):
     return preguntas_unicas
 
 def obtener_preguntas(archivo_entrada, temas, num_preguntas, curso_elegido):
+    # Si no hay temas, dejamos la lista vacía para filtrar todo
     temas = [int(t.strip()) for t in temas if t.strip().isdigit()]
     wb, sheet, encabezados = cargar_datos(archivo_entrada)
 

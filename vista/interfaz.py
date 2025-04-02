@@ -49,7 +49,7 @@ class ExcelApp:
         add_input("📂 Archivo de preguntas:", self.archivo_combo)
 
         self.temas_entry = ttk.Entry(form)
-        add_input("📘 Tema(s) (separados por coma):", self.temas_entry)
+        add_input("📘 Tema(s) (separados por coma, dejar vacío para general):", self.temas_entry)
 
         self.curso_combo = ttk.Combobox(form, state="readonly")
         add_input("🎓 Curso destino:", self.curso_combo)
@@ -84,7 +84,8 @@ class ExcelApp:
         tema_curso = self.tema_curso_entry.get().strip()
         num_preguntas = self._try_parse_int(self.num_preguntas_entry.get())
 
-        if not archivo or not temas or not curso or not tema_curso or not num_preguntas:
+        # ✅ Permitir que 'temas' esté vacío
+        if not archivo or not curso or not tema_curso or not num_preguntas:
             messagebox.showwarning("Atención", "Por favor, completa todos los campos.")
             return
 
